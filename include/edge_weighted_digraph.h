@@ -6,6 +6,8 @@
 #include <iostream>
 #include "directed_edge.h"
 
+namespace sp {
+
 class edge_weighted_digraph {
     friend std::istream &operator>>(std::istream & __in, edge_weighted_digraph &__ewd) {
         int __vertex, __edges;
@@ -77,5 +79,7 @@ private:
     int     _M_edges;
     std::vector<std::vector<directed_edge>> _M_adj;
 };
+
+}
 
 #endif // __EDGE_WEIGHTED_DIGRAPH_H

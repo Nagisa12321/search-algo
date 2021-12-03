@@ -2,6 +2,8 @@
 #define __DIRECTED_EDGE_H
 #include <iostream>
 
+namespace sp {
+
 class directed_edge {
     friend std::ostream &operator<<(std::ostream & __out, const directed_edge &__de) {
         __out << "[" << __de._M_v 
@@ -22,9 +24,11 @@ public:
     int from() const { return _M_v; }
     int to() const { return _M_w; }
 private:
-    const int         _M_v;
-    const int         _M_w;
-    const double      _M_weight;
+    int         _M_v;
+    int         _M_w;
+    double      _M_weight;
 };
+
+}
 
 #endif // __DIRECTED_EDGE_H

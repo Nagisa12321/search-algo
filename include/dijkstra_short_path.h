@@ -20,7 +20,7 @@ public:
         _M_dist_to[__s] = 0;
         
         auto cmp = [&](const int &__v1, const int &__v2) {
-            return _M_dist_to[__v1] < _M_dist_to[__v2];
+            return _M_dist_to[__v1] > _M_dist_to[__v2];
         };
         std::priority_queue<int, std::vector<int>, decltype(cmp)> __pq(cmp);
         std::vector<bool> __relaxed(_M_ewd.vertex(), false);
@@ -33,11 +33,11 @@ public:
             if (__relaxed[__from]) continue;
             __relaxed[__from] = true;
 
-            for (directed_edge &__e : _M_ewd.adj(__from)) {
-                int __to = __e.to();
-                if (_M_dist_to[__to] > _M_dist_to[__from] + __e.weight()) {
-                    _M_dist_to[__to] = _M_dist_to[__from] + __e.weight();
-                    _M_edge_to[__to] = &__e;
+            for (directed_edge *__e : _M_ewd.adj(__from)) {
+                int __to = __e->to();
+                if (_M_dist_to[__to] > _M_dist_to[__from] + __e->weight()) {
+                    _M_dist_to[__to] = _M_dist_to[__from] + __e->weight();
+                    _M_edge_to[__to] = __e;
                     __pq.push(__to);
                 }
             }
@@ -57,7 +57,7 @@ public:
     }
 
 private:
-    edge_weighted_digraph _M_ewd;
+    const edge_weighted_digraph &_M_ewd;
     int _M_s;
     std::vector<directed_edge *> _M_edge_to;
     std::vector<double> _M_dist_to;

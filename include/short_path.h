@@ -45,11 +45,11 @@ private:
     }
 
     void relax(int __from) {
-        for (directed_edge &__e : _M_ewd.adj(__from)) {
-            int __to = __e.to();
-            if (_M_dist_to[__to] > _M_dist_to[__from] + __e.weight()) {
-                _M_dist_to[__to] = _M_dist_to[__from] + __e.weight();
-                _M_edge_to[__to] = &__e;
+        for (directed_edge *__e : _M_ewd.adj(__from)) {
+            int __to = __e->to();
+            if (_M_dist_to[__to] > _M_dist_to[__from] + __e->weight()) {
+                _M_dist_to[__to] = _M_dist_to[__from] + __e->weight();
+                _M_edge_to[__to] = __e;
             }
         }
     }

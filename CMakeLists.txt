@@ -14,9 +14,17 @@ target_include_directories(search_algo_interface INTERFACE include)
 # debug mode
 add_compile_options(-g)
 
+# add openMP
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    # set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
+
 # project files
 set(PROJECT_SOURCES ${PROJECT_SOURCE_DIR}/src)
-FILE(GLOB SEARCH_ALGO_SOURCE_FILES ${PROJECT_SOURCES}/*.cpp)
+FILE(GLOB SEARCH_ALGO_SOURCE_FILES ${PROJECT_SOURCES}/*.c*)
 
 # create the bin
 foreach(X ${SEARCH_ALGO_SOURCE_FILES})

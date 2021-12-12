@@ -1,5 +1,6 @@
 #ifndef __EDGE_WEIGHTED_DIGRAPH_H
 #define __EDGE_WEIGHTED_DIGRAPH_H
+#include <algorithm>
 #include <istream>
 #include <ostream>
 #include <vector>
@@ -13,12 +14,12 @@ class edge_weighted_digraph {
         int __vertex, __edges;
         __in >> __vertex >> __edges;
         for (int __v = 0; __v < __vertex; ++__v)
-            __ewd._M_adj.push_back(std::vector<directed_edge>()); 
+            __ewd._M_adj.push_back(std::vector<directed_edge *>()); 
         for (int __e = 0; __e < __edges; ++__e) {
             int __from, __to;
             double __weight;
             __in >> __from >> __to >> __weight;
-            __ewd._M_adj[__from].emplace_back(__from, __to, __weight);
+            __ewd._M_adj[__from].push_back(new directed_edge(__from, __to, __weight));
         }
         __ewd._M_edges = __edges;
         __ewd._M_vertex = __vertex;
@@ -30,7 +31,7 @@ class edge_weighted_digraph {
         for (int __v = 0; __v < __ewd._M_vertex; ++__v) {
             __out << __v << ": ";
             for (int __e = 0; __e < __ewd._M_adj[__v].size(); ++__e) {
-                __out << __ewd._M_adj[__v][__e] << ", ";
+                __out << *__ewd._M_adj[__v][__e] << ", ";
             }
             __out << std::endl;
         }
@@ -53,21 +54,29 @@ public:
 
     }
 
+    ~edge_weighted_digraph() {
+        for (const std::vector<directed_edge *> &__vec : _M_adj) {
+            for (directed_edge *__de : __vec) {
+                delete __de;
+            }
+        }
+    }
+
     int vertex() const { return _M_vertex; }
     int edges() const { return _M_edges; }
     void add_edge(const directed_edge &__edge) {
-        _M_adj[__edge.from()].push_back(__edge);
+        _M_adj[__edge.from()].push_back(new directed_edge(__edge));
         ++_M_edges;
     }
 
-    std::vector<directed_edge> adj(int __vertex) {
+    std::vector<directed_edge *> adj(int __vertex) const {
         return _M_adj[__vertex];
     }
 
-    std::vector<directed_edge> edges() {
-        std::vector<directed_edge> __res;
+    std::vector<directed_edge *> edges() {
+        std::vector<directed_edge *> __res;
         for (int __v = 0; __v < _M_vertex; ++__v) {
-            for (const directed_edge &__edge : _M_adj[__v]) 
+            for (directed_edge *__edge : _M_adj[__v]) 
                 __res.push_back(__edge);
         }
         return __res;
@@ -77,7 +86,7 @@ public:
 private:
     int     _M_vertex;
     int     _M_edges;
-    std::vector<std::vector<directed_edge>> _M_adj;
+    std::vector<std::vector<directed_edge *>> _M_adj;
 };
 
 }

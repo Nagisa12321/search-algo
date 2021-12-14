@@ -1,32 +1,42 @@
+#include <bits/types/clock_t.h>
+#include <bits/types/struct_timeval.h>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <vector>
+#include <ctime>
 #include <omp.h>
+#include <sys/time.h>
 
 using namespace std;
 
 // config
 #define PRINT_DISTANCE_MATRIX false
-#define PRINT_RESULT true
-#define PRINT_FILE true
+#define PRINT_RESULT          false
+#define PRINT_FILE            true
+#define CHECK_TIME            1
+#define DEBUG                 false
 
-const string __input_file_name("../resource/mediumEWD.txt");
+const string __input_file_name("../resource/10000EWD.txt");
 const string __output_file_name("__result_omp.txt");
 const int __i4_huge = 0xffff;
 int __nv;
 
 void __init(vector<vector<double>> &__ohd);
 double *__dijkstra_distance(const vector<vector<double>> &__ohd);
+double *__dijkstra_distance_single(const vector<vector<double>> &__ohd);
 void __print_matrix(const vector<vector<double>> &__ohd);
 void __print_result(double *__dist_to);
 void __print_file(double *__dist_to);
 
 int main() {
-  double *__dist_to;
+  double *__dist_to_multi, *__dist_to;
   vector<vector<double>> __ohd;
+#if CHECK_TIME
+  struct timeval __ts_multi, __te_multi, __ts, __te;
+#endif
 
   // init the program data;
   __init(__ohd);
@@ -35,17 +45,41 @@ int main() {
   if (PRINT_DISTANCE_MATRIX)
     __print_matrix(__ohd);
 
-  // use the algo
-  __dist_to = __dijkstra_distance(__ohd);
+
+#if CHECK_TIME
+  gettimeofday(&__ts_multi, nullptr);
+#endif
+  __dist_to_multi = __dijkstra_distance(__ohd);
+#if CHECK_TIME
+  gettimeofday(&__te_multi, nullptr);
+  clock_t __spend_multi = (__te_multi.tv_sec - __ts_multi.tv_sec) * 1000 
+      + (__te_multi.tv_usec - __ts_multi.tv_usec) / 1000;
+#endif
+  
+#if CHECK_TIME
+  gettimeofday(&__ts, nullptr);
+#endif
+  __dist_to = __dijkstra_distance_single(__ohd);
+#if CHECK_TIME
+  gettimeofday(&__te, nullptr);
+  clock_t __spend = (__te.tv_sec - __ts.tv_sec) * 1000 
+      + (__te.tv_usec - __ts.tv_usec) / 1000;
+#endif  
 
   // print result
   if (PRINT_RESULT)
-    __print_result(__dist_to);
+    __print_result(__dist_to_multi);
+
+#if CHECK_TIME
+  cout << "  multi thread spend time: " << __spend_multi << " ms." << endl;
+  cout << "  single thread spend time: " << __spend << " ms." << endl;
+#endif
 
   // print to file
   if (PRINT_FILE)
-    __print_file(__dist_to);
+    __print_file(__dist_to_multi);
 
+  delete[] __dist_to_multi;
   delete[] __dist_to;
 }
 
@@ -63,7 +97,7 @@ void __init(vector<vector<double>> &ohd) {
 
   fis >> __nv;
   fis >> edges;
-
+  cout << "  start to read the file (nv=" << __nv << ", edges=" << edges << ")" << endl;
   ohd = vector<vector<double>>(__nv, vector<double>(__nv));
   for (i = 0; i < __nv; ++i) {
     for (j = 0; j < __nv; ++j) {
@@ -81,6 +115,7 @@ void __init(vector<vector<double>> &ohd) {
 
     ohd[from][to] = distance;
   }
+  cout << "  ok to read the file" << endl;
 }
 
 double *__dijkstra_distance(const vector<vector<double>> &ohd) {
@@ -97,7 +132,7 @@ double *__dijkstra_distance(const vector<vector<double>> &ohd) {
   for (i = 0; i < __nv; ++i)
     dist_to[i] = ohd[0][i];
 
-#pragma omp parallel num_threads(8) \
+#pragma omp parallel num_threads(12) \
   shared (connected, md, dist_to, mv, ohd)
   {
     int i;
@@ -156,11 +191,11 @@ double *__dijkstra_distance(const vector<vector<double>> &ohd) {
 //
 # pragma omp single 
       {
-        cout << "  md=" << md << ", mv=" << mv << endl;
         if (mv != - 1) {
           connected[mv] = true;
-          cout << "  P" << my_id
-               << ": Connecting node " << mv << "\n";;
+          if (DEBUG)
+            cout << "  t" << my_id
+                << ": Connecting node " << mv << "\n";;
         }
       }  
 //
@@ -238,4 +273,56 @@ void __print_matrix(const vector<vector<double>> &__ohd) {
     }
     cout << "\n";
   }
+}
+
+double *__dijkstra_distance_single(const vector<vector<double>> &ohd) {
+  vector<bool> connected(__nv, false);
+  double *dist_to;
+  int i;
+  int step;
+  int mv; // the index of the nearest unconnected node.
+  double md; // the distance from node 0 to the nearest unconnected node.
+
+  connected[0] = true;
+  dist_to = new double[__nv];
+
+  // init dist_to to one_step distance;
+  for (i = 0; i < __nv; ++i)
+    dist_to[i] = ohd[0][i];
+
+  // every step will find a new node connect to the tree.
+  for (step = 1; step < __nv; ++step) {
+    md = __i4_huge;
+    mv = -1;
+    for (i = 0; i < __nv; ++i) {
+      if (!connected[i] && dist_to[i] < md) {
+        md = dist_to[i];
+        mv = i;
+      }
+    }
+
+    // can not find any vertex
+    if (mv == -1) {
+      cout << "\n";
+      cout << "DIJKSTRA_DISTANCE - Warning!\n";
+      cout << "  Search terminated early.\n";
+      cout << "  Graph might not be connected.\n";
+      break;
+    }
+
+    // find a good vertex, so mark it connected.
+    connected[mv] = true;
+
+    // update the dist_to (relax the finded vertex)
+    for (i = 0; i < __nv; ++i) {
+      // the connected can be the best
+      // TODO: prove here
+      if (!connected[i]) {
+        if (dist_to[i] > dist_to[mv] + ohd[mv][i]) {
+          dist_to[i] = dist_to[mv] + ohd[mv][i];
+        }
+      }
+    }
+  }
+  return dist_to;
 }

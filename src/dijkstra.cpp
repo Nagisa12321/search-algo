@@ -13,7 +13,7 @@ int main(int __argc, char *__argv[]) {
         return 0;
     }
     int __source = atoi(__argv[1]);
-    std::ifstream __fis("../resource/mediumEWD.txt");
+    std::ifstream __fis("../resource/100000EWD.txt");
     sp::edge_weighted_digraph __ewd;
     __fis >> __ewd;
 

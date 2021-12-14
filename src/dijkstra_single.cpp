@@ -10,9 +10,9 @@ using namespace std;
 // config
 #define PRINT_DISTANCE_MATRIX false
 #define PRINT_RESULT true
-#define PRINT_FILE true
+#define PRINT_FILE false
 
-const string __input_file_name("../resource/mediumEWD.txt");
+const string __input_file_name("../resource/100000EWD.txt");
 const string __output_file_name("__result.txt");
 const int __i4_huge = 0xffff;
 int __nv;

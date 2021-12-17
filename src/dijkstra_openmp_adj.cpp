@@ -7,6 +7,7 @@
 #include <ctime>
 #include <omp.h>
 #include <sys/time.h>
+#include <unordered_map>
 
 using namespace std;
 
@@ -15,25 +16,26 @@ using namespace std;
 #define PRINT_RESULT          false
 #define PRINT_FILE            true
 #define CHECK_TIME            1
-#define ___DEBUG              true
+#define DEBUG                 false
 
 string __input_file_name;
 const string __output_file_name("__result_omp.txt");
 const int __i4_huge = 0xffff;
 int __nv;
 
-void __init(vector<vector<double>> &__ohd);
-double *__dijkstra_distance(const vector<vector<double>> &__ohd);
-double *__dijkstra_distance_single(const vector<vector<double>> &__ohd);
-void __print_matrix(const vector<vector<double>> &__ohd);
+void __init(vector<unordered_map<int, double>> &__ohd);
+double *__dijkstra_distance(const vector<unordered_map<int, double>> &__ohd);
+double *__dijkstra_distance_single(const vector<unordered_map<int, double>> &__ohd);
+void __print_matrix(const vector<unordered_map<int, double>> &__ohd);
 void __print_result(double *__dist_to);
 void __print_file(double *__dist_to);
 bool __compare_result(const double *__dt1, const double *__dt2);
 
+
 int main(int argc, char **argv) {
   __input_file_name = argv[1];
   double *__dist_to_multi, *__dist_to;
-  vector<vector<double>> __ohd;
+  vector<unordered_map<int, double>> __ohd;
 #if CHECK_TIME
   struct timeval __ts_multi, __te_multi, __ts, __te;
 #endif
@@ -82,6 +84,7 @@ int main(int argc, char **argv) {
     cout << " ---- Successful ----" << endl;
   }
 
+
   // print to file
   if (PRINT_FILE)
     __print_file(__dist_to_multi);
@@ -90,7 +93,7 @@ int main(int argc, char **argv) {
   delete[] __dist_to;
 }
 
-void __init(vector<vector<double>> &ohd) {
+void __init(vector<unordered_map<int, double>> &__ohd) {
   int i;
   int j;
   int edges;
@@ -104,28 +107,25 @@ void __init(vector<vector<double>> &ohd) {
 
   fis >> __nv;
   fis >> edges;
-  cout << "  start to read the file (nv=" << __nv << ", edges=" << edges << ")" << endl;
-  ohd = vector<vector<double>>(__nv, vector<double>(__nv));
-  for (i = 0; i < __nv; ++i) {
-    for (j = 0; j < __nv; ++j) {
-      if (i == j) {
-        ohd[i][j] = 0;
-      } else {
-        ohd[i][j] = __i4_huge;
-      }
-    }
-  }
-
+  cout << " Start to read the input file ..... " << endl;
+  __ohd = vector<unordered_map<int, double>>(__nv);
+  for (int i = 0; i < __nv; ++i)
+    { __ohd[i][i] = 0; }
   for (i = 0; i < edges; ++i) {
     fis >> from >> to;
     fis >> distance;
 
-    ohd[from][to] = distance;
+    __ohd[from][to] = distance;
   }
-  cout << "  ok to read the file" << endl;
+  cout << "  Ok to read the input file .... " << endl;
 }
 
-double *__dijkstra_distance(const vector<vector<double>> &ohd) {
+static double __get_val(const vector<unordered_map<int, double>> &ohd, int i, int j) {
+  if (!ohd[i].count(j)) return __i4_huge;
+  else return ohd[i].at(j);
+}
+
+double *__dijkstra_distance(const vector<unordered_map<int, double>> &ohd) {
   vector<bool> connected(__nv, false);
   double *dist_to;
   int step;
@@ -137,7 +137,7 @@ double *__dijkstra_distance(const vector<vector<double>> &ohd) {
 
   // init dist_to to one_step distance;
   for (i = 0; i < __nv; ++i)
-    dist_to[i] = ohd[0][i];
+    dist_to[i] = __get_val(ohd, 0, i);
 
 #pragma omp parallel num_threads(12) \
   shared (connected, md, dist_to, mv, ohd)
@@ -200,7 +200,7 @@ double *__dijkstra_distance(const vector<vector<double>> &ohd) {
       {
         if (mv != - 1) {
           connected[mv] = true;
-          if (___DEBUG)
+          if (DEBUG)
             cout << "  t" << my_id
                 << ": Connecting node " << mv << "\n";;
         }
@@ -221,8 +221,8 @@ double *__dijkstra_distance(const vector<vector<double>> &ohd) {
             // Because mv is now in the tree. 
             // So dist_to[mv] is the correct value!
             // 
-            if (dist_to[i] > dist_to[mv] + ohd[mv][i]) {
-              dist_to[i] = dist_to[mv] + ohd[mv][i];
+            if (dist_to[i] > dist_to[mv] + __get_val(ohd, mv, i)) {
+              dist_to[i] = dist_to[mv] + __get_val(ohd, mv, i);
             }
           }
         }
@@ -260,7 +260,7 @@ void __print_file(double *__dist_to) {
   }
 }
 
-void __print_matrix(const vector<vector<double>> &__ohd) {
+void __print_matrix(const vector<unordered_map<int, double>> &__ohd) {
   int __i, __j;
   cout << "\n";
   cout << "  Distance matrix:\n";
@@ -272,17 +272,17 @@ void __print_matrix(const vector<vector<double>> &__ohd) {
   for (__i = 0; __i < __nv; __i++) {
     cout << "\t[" << __i << "]";
     for (__j = 0; __j < __nv; __j++) {
-      if (__ohd[__i][__j] == __i4_huge) {
+      if (!__ohd[__i].count(__j)) {
         cout << "\tInf";
       } else {
-        cout << "\t" << __ohd[__i][__j];
+        cout << "\t" << __ohd[__i].at(__j);
       }
     }
     cout << "\n";
   }
 }
 
-double *__dijkstra_distance_single(const vector<vector<double>> &ohd) {
+double *__dijkstra_distance_single(const vector<unordered_map<int, double>> &ohd) {
   vector<bool> connected(__nv, false);
   double *dist_to;
   int i;
@@ -295,7 +295,7 @@ double *__dijkstra_distance_single(const vector<vector<double>> &ohd) {
 
   // init dist_to to one_step distance;
   for (i = 0; i < __nv; ++i)
-    dist_to[i] = ohd[0][i];
+    dist_to[i] = __get_val(ohd, 0, i);
 
   // every step will find a new node connect to the tree.
   for (step = 1; step < __nv; ++step) {
@@ -325,14 +325,15 @@ double *__dijkstra_distance_single(const vector<vector<double>> &ohd) {
       // the connected can be the best
       // TODO: prove here
       if (!connected[i]) {
-        if (dist_to[i] > dist_to[mv] + ohd[mv][i]) {
-          dist_to[i] = dist_to[mv] + ohd[mv][i];
+        if (dist_to[i] > dist_to[mv] + __get_val(ohd, mv, i)) {
+          dist_to[i] = dist_to[mv] + __get_val(ohd, mv, i);
         }
       }
     }
   }
   return dist_to;
 }
+
 
 bool __compare_result(const double *__dt1, const double *__dt2) {
   bool __res = true;

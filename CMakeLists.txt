@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.18)
 
 project(search_algo)
 message(STATUS "Start Cmake...")
@@ -6,8 +6,10 @@ message(STATUS "Start Cmake...")
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # the .h files
+include_directories(/usr/lib/llvm-14/lib/clang/14.0.0/include)
 add_library(search_algo_interface INTERFACE)
 target_include_directories(search_algo_interface INTERFACE include)
 
@@ -15,11 +17,11 @@ target_include_directories(search_algo_interface INTERFACE include)
 add_compile_options(-g)
 
 # add openMP
+# find_package(MPI REQUIRED)
 find_package(OpenMP)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    # set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
 # project files
@@ -34,4 +36,5 @@ foreach(X ${SEARCH_ALGO_SOURCE_FILES})
     message(STATUS "make and link the test file \"${cooked_name}\"")
     add_executable(${cooked_name} ${X})
     target_link_libraries(${cooked_name} PRIVATE search_algo_interface)
+    target_link_libraries(${cooked_name} PRIVATE OpenMP::OpenMP_CXX)
 endforeach()

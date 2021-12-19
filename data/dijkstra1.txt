@@ -1,0 +1,36 @@
+ $ ./dijkstra_openmp_adj ../resource/100000EWD.txt
+ 
+ Start to read the input file ..... 
+  Ok to read the input file .... 
+  t5: 41666 - 49999
+  t8: 66666 - 74999
+  t1: 8333 - 16665
+  t0: 0 - 8332
+  t7: 58333 - 66665
+  t2: 16666 - 24999
+  t4: 33333 - 41665
+  t10: 83333 - 91665
+  t6: 50000 - 58332
+  t3: 25000 - 33332
+  t11: 91666 - 99999
+  t9: 75000 - 83332
+  t5 end
+  t0 end
+  t8 end
+  t6 end
+  t11 end
+  t7 end
+  t9 end
+  t2 end
+  t3 end
+  t10 end
+  t4 end
+  t1 end
+
+DIJKSTRA_DISTANCE - Warning!
+  Search terminated early.
+  Graph might not be connected.
+  multi thread spend time: 166949 ms.
+  single thread spend time: 1071676 ms.
+   Start to compare the result ... 
+ ---- Successful ----

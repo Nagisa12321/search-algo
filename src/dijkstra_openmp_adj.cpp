@@ -23,6 +23,7 @@ const string __output_file_name("__result_omp.txt");
 const int __i4_huge = 0xffff;
 int __nv;
 
+
 void __init(vector<unordered_map<int, double>> &__ohd);
 double *__dijkstra_distance(const vector<unordered_map<int, double>> &__ohd);
 double *__dijkstra_distance_single(const vector<unordered_map<int, double>> &__ohd);

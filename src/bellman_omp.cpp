@@ -8,12 +8,13 @@
 #include <unordered_map>
 #include <vector>
 #include <sys/time.h>
+#include <omp.h>
 
 using namespace std;
 
 #define DEBUG_MODE 		false
 #define PRINT_MATRIX	false
-#define TIMER			true
+#define TIMER					true
 #define PRINT_FILE		true
 
 void __abort(const string &__message);
@@ -31,8 +32,8 @@ void timer_print(const string &name);
 
 int __nv; // number of vertex.
 struct timeval __ts, __te;
-const int __inf = 0xffff;
-const string __out_name("bellman.txt");
+const int __inf = 0xffff;	
+const string __out_name("bellman_omp.txt");
 
 
 int main(int __argc, char **__argv) {
@@ -75,7 +76,7 @@ int main(int __argc, char **__argv) {
 	// 
 	// Show the time spend
 	// 
-	timer_print("bellman");
+	timer_print("bellman-omp");
 	// 
 	// Print to the file 
 	// 
@@ -187,8 +188,8 @@ void bellman_ford_sp(const vector<unordered_map<int, double>> &__g, double *__di
 // The distance to ohter vetex is endless
 // And 0 to itself is 0.  
 //
-	int __v, __poll; 
-	for (__v = 0; __v < __nv; ++__v)
+	int __poll; 
+	for (int __v = 0; __v < __nv; ++__v)
 		__dist_to[__v] = __inf;
 	__dist_to[0] = 0;
 
@@ -199,27 +200,65 @@ void bellman_ford_sp(const vector<unordered_map<int, double>> &__g, double *__di
 	__q.push(0);
 	__on_q[0] = true;
 
-	while (!__q.empty()) {
-		__poll = __q.front();
-		__q.pop();
-		__dbg("relax [" + to_string(__poll) + "]. ");
-		__on_q[__poll] = false;
 //
-// and then relax the __poll. 
-// from is __poll and then to is __v;
+// Open 12 threads. 
 //
-		for (__v = 0; __v < __nv; ++__v) {
-			if (__dist_to[__v] > __dist_to[__poll] + __distance(__g, __poll, __v)) {
-				__dist_to[__v] = __dist_to[__poll] + __distance(__g, __poll, __v);
-// 
-// if the __v is not int the queue
-// then put it to the queue
-//
-				if (!__on_q[__v]) {
-					__q.push(__v);
-					__on_q[__v] = true;
+#pragma omp parallel num_threads(12)
+	{
+		int my_id = omp_get_thread_num();
+    int nth = omp_get_num_threads();
+    int my_first = (my_id * __nv) / nth;
+    int my_last = ((my_id + 1) * __nv) / nth - 1;
+		int __v;	// thread local
+#pragma omp critical
+	{
+		__info(to_string(my_id) + " start to run!, first is " + to_string(my_first) + ", last is " + to_string(my_last));
+	}	
+		while (1) {
+	//
+	// One thread can take the head of the queue
+	//
+#pragma omp single
+			{
+				if (__q.empty()) __poll = -1;
+				else {
+					__poll = __q.front();
+					__q.pop();
 				}
+				__dbg("relax [" + to_string(__poll) + "]. ");
+				__on_q[__poll] = false;
 			}
+	// 
+	// This barrier make sure that
+	// the thread below's operation is indeed completed
+	// 
+#pragma omp barrier
+	//
+	// and then relax the __poll. 
+	// from is __poll and then to is __v;
+	//
+			if (__poll != -1) {
+				for (__v = my_first; __v <= my_last; ++__v) {
+					if (__dist_to[__v] > __dist_to[__poll] + __distance(__g, __poll, __v)) {
+						__dist_to[__v] = __dist_to[__poll] + __distance(__g, __poll, __v);
+	// 
+	// if the __v is not int the queue
+	// then put it to the queue
+	//
+#pragma omp critical
+						{
+							if (!__on_q[__v]) {
+								__q.push(__v);
+								__on_q[__v] = true;
+							}
+						}
+					}
+				}
+			} else break;
+	//
+	// This barrier... 
+	//
+#pragma omp barrier
 		}
 	}
 

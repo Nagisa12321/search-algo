@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
+#include <ios>
 #include <iostream>
 #include <omp.h>
 #include <ostream>
@@ -15,7 +16,8 @@ using namespace std;
 #define DEBUG_MODE false
 #define PRINT_MATRIX false
 #define TIMER true
-#define PRINT_FILE true
+#define PRINT_FILE false
+#define TIMER_FILE true
 
 void __abort(const string &__message);
 void __dbg(const string &__message);
@@ -36,6 +38,7 @@ int __nv; // number of vertex.
 struct timeval __ts, __te;
 const int __inf = 0xffff;
 const string __out_name("bellman_omp.txt");
+string __input_file;
 
 int main(int __argc, char **__argv) {
   if (__argc < 2) {
@@ -44,7 +47,7 @@ int main(int __argc, char **__argv) {
   //
   // Get the Input file
   //
-  string __input_file = __argv[1];
+  __input_file = __argv[1];
 
   //
   // The graph of the input file.
@@ -302,6 +305,11 @@ void timer_print(const string &name) {
   clock_t __spend =
       (__te.tv_sec - __ts.tv_sec) * 1000 + (__te.tv_usec - __ts.tv_usec) / 1000;
   cout << name << "'s time is " << __spend << " ms. " << endl;
+
+  if (TIMER_FILE) {
+    ofstream __fis("time.txt", ios_base::app);
+    __fis << __input_file << "\t" << __spend << " ms. " << "\t" << "bellman-openmp\t" << endl;
+  }
 }
 
 void print_file(double *__dist_to) {

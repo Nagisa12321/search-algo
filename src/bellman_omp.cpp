@@ -13,11 +13,11 @@
 
 using namespace std;
 
-#define DEBUG_MODE false
+#define DEBUG_MODE true
 #define PRINT_MATRIX false
 #define TIMER true
-#define PRINT_FILE false
-#define TIMER_FILE true
+#define PRINT_FILE true
+#define TIMER_FILE false
 
 void __abort(const string &__message);
 void __dbg(const string &__message);
@@ -34,7 +34,8 @@ void timer_start();
 void timer_end();
 void timer_print(const string &name);
 
-int __nv; // number of vertex.
+long __nv; // number of vertex.
+long __ne;
 struct timeval __ts, __te;
 const int __inf = 0xffff;
 const string __out_name("bellman_omp.txt");
@@ -113,7 +114,6 @@ void __info(const string &__message) {
 //
 void init(vector<unordered_map<int, double>> &__g, const string &__file_path) {
   fstream __fis(__file_path);
-  int __e;
   int __offset;
   int __from, __to;
   double __distance;
@@ -123,7 +123,7 @@ void init(vector<unordered_map<int, double>> &__g, const string &__file_path) {
   }
 
   __info("start to read the file...");
-  __fis >> __nv >> __e;
+  __fis >> __nv >> __ne;
 
   __dbg("start to create the vector...");
   __g = vector<unordered_map<int, double>>(__nv);
@@ -132,7 +132,7 @@ void init(vector<unordered_map<int, double>> &__g, const string &__file_path) {
     __g[__offset][__offset] = 0;
   }
 
-  for (__offset = 0; __offset < __e; ++__offset) {
+  for (__offset = 0; __offset < __ne; ++__offset) {
     __fis >> __from >> __to >> __distance;
     __g[__from][__to] = __distance;
   }
@@ -225,7 +225,7 @@ void bellman_ford_sp(const vector<unordered_map<int, double>> &__g,
       __info(to_string(my_id) + " start to run!, first is " +
              to_string(my_first) + ", last is " + to_string(my_last));
     }
-    while (1) {
+    for (;;) {
       //
       // One thread can take the head of the queue
       //
@@ -267,8 +267,7 @@ void bellman_ford_sp(const vector<unordered_map<int, double>> &__g,
             }
           }
         }
-      } else
-        break;
+      } else break;
         //
         // This barrier...
         //

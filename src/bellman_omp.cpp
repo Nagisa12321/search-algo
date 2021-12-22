@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define DEBUG_MODE true
+#define DEBUG_MODE false
 #define PRINT_MATRIX false
 #define TIMER true
 #define PRINT_FILE true
@@ -236,9 +236,9 @@ void bellman_ford_sp(const vector<unordered_map<int, double>> &__g,
         else {
           __poll = __q.front();
           __q.pop();
+          __on_q[__poll] = false;
         }
         __dbg("relax [" + to_string(__poll) + "]. ");
-        __on_q[__poll] = false;
       }
       //
       // This barrier make sure that
@@ -267,12 +267,16 @@ void bellman_ford_sp(const vector<unordered_map<int, double>> &__g,
             }
           }
         }
-      } else break;
+      } 
+      if (__poll == -1)
+        goto end;
         //
         // This barrier...
         //
 #pragma omp barrier
     }
+
+end: {}
   }
 
   __info("bellman-ford end now.");

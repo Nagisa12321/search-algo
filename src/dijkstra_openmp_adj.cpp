@@ -14,9 +14,10 @@ using namespace std;
 // config
 #define PRINT_DISTANCE_MATRIX false
 #define PRINT_RESULT          false
-#define PRINT_FILE            true
+#define PRINT_FILE            false
 #define CHECK_TIME            1
 #define DEBUG                 false
+#define TIMER_FILE 		true
 
 string __input_file_name;
 const string __output_file_name("__result_omp.txt");
@@ -78,17 +79,23 @@ int main(int argc, char **argv) {
   cout << "  single thread spend time: " << __spend << " ms." << endl;
 #endif
   cout << "   Start to compare the result ... " << endl;
-  bool __res = __compare_result(__dist_to_multi, __dist_to);
-  if (!__res) {
-    cout << " ---- Failed ----" << endl;
-  } else {
-    cout << " ---- Successful ----" << endl;
-  }
+  // bool __res = __compare_result(__dist_to_multi, __dist_to);
+  // if (!__res) {
+  //   cout << " ---- Failed ----" << endl;
+  // } else {
+  //   cout << " ---- Successful ----" << endl;
+  // }
 
 
   // print to file
   if (PRINT_FILE)
     __print_file(__dist_to_multi);
+
+  if (TIMER_FILE) {
+    ofstream __fis("time.txt", ios_base::app);
+    __fis << __input_file_name << "\t" << __spend << " ms. " << "\t" << "dijkstra\t" << endl;
+    __fis << __input_file_name << "\t" << __spend_multi << " ms. " << "\t" << "dijkstra_omp\t" << endl;
+  }
 
   delete[] __dist_to_multi;
   delete[] __dist_to;

@@ -13,11 +13,11 @@
 
 using namespace std;
 
-#define DEBUG_MODE false
-#define PRINT_MATRIX false
-#define TIMER true
-#define PRINT_FILE true
-#define TIMER_FILE false
+#define DEBUG_MODE 		false
+#define PRINT_MATRIX	false
+#define TIMER		    	true
+#define PRINT_FILE		true
+#define TIMER_FILE 		false
 
 void __abort(const string &__message);
 void __dbg(const string &__message);
@@ -240,11 +240,6 @@ void bellman_ford_sp(const vector<unordered_map<int, double>> &__g,
         }
         __dbg("relax [" + to_string(__poll) + "]. ");
       }
-      //
-      // This barrier make sure that
-      // the thread below's operation is indeed completed
-      //
-#pragma omp barrier
       //
       // and then relax the __poll.
       // from is __poll and then to is __v;

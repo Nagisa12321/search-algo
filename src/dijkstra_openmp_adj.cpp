@@ -269,21 +269,21 @@ void __print_file(double *__dist_to) {
 }
 
 void __print_matrix(const vector<unordered_map<int, double>> &__ohd) {
-  int __i, __j;
+  int i, j;
   cout << "\n";
   cout << "  Distance matrix:\n";
   cout << "\n";
   cout << "\t";
-  for (__i = 0; __i < __nv; __i++)
-    cout << "\t[" << __i << "]";
+  for (i = 0; i < __nv; i++)
+    cout << "\t[" << i << "]";
   cout << endl;
-  for (__i = 0; __i < __nv; __i++) {
-    cout << "\t[" << __i << "]";
-    for (__j = 0; __j < __nv; __j++) {
-      if (!__ohd[__i].count(__j)) {
+  for (i = 0; i < __nv; i++) {
+    cout << "\t[" << i << "]";
+    for (j = 0; j < __nv; j++) {
+      if (!__ohd[i].count(j)) {
         cout << "\tInf";
       } else {
-        cout << "\t" << __ohd[__i].at(__j);
+        cout << "\t" << __ohd[i].at(j);
       }
     }
     cout << "\n";

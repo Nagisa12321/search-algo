@@ -1,8 +1,10 @@
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <mpi.h>
+#include <mpio.h>
 #include <string.h>
 #include <unordered_map>
 #include <vector>
@@ -28,6 +30,21 @@ int main(int argc, char **argv) {
   MPI_Init(NULL, NULL);
   MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+  // 
+  // Open File 
+  //
+  const char *file_connected = "./connected.txt";
+  const char *file_dist_to = "./dist_to.txt";
+  // Create two files.
+  // connected.txt and dist_to.txt
+  MPI_File fh_connected, fh_dist_to;
+  
+  MPI_File_open(MPI_COMM_WORLD, file_connected,
+          MPI_MODE_RDWR /*| MPI_MODE_DELETE_ON_CLOSE */| MPI_MODE_CREATE, MPI_INFO_NULL,
+          &fh_connected);
+  MPI_File_open(MPI_COMM_WORLD, file_dist_to, MPI_MODE_RDWR |/* MPI_MODE_DELETE_ON_CLOSE | */MPI_MODE_CREATE,
+                MPI_INFO_NULL, &fh_dist_to);
 
   if (my_rank != 0) {
     int nv;
@@ -78,32 +95,23 @@ int main(int argc, char **argv) {
 
     //
     // Now start the dijkstra algo
-    // Create two files.
-    // connected.txt and dist_to.txt
-    const char *file_connected = "./_&_connected.txt";
-    const char *file_dist_to = "./_&_dist_to.txt";
-    MPI_File fh_connected, fh_dist_to;
     //
     // Open the file every process.
     //
-    MPI_File_open(MPI_COMM_WORLD, file_connected,
-                  MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL,
-                  &fh_connected);
-    MPI_File_open(MPI_COMM_WORLD, file_dist_to, MPI_MODE_RDWR | MPI_MODE_CREATE,
-                  MPI_INFO_NULL, &fh_dist_to);
+    // MPI_File_open(MPI_COMM_WORLD, file_connected,
+    //               MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL,
+    //               &fh_connected);
+    // MPI_File_open(MPI_COMM_WORLD, file_dist_to, MPI_MODE_RDWR | MPI_MODE_CREATE,
+    //               MPI_INFO_NULL, &fh_dist_to);
 
-    //
-    // Process 1 should init the file.
-    //
+
     if (my_rank == 1) {
       int *connected = new int[nv];
       double *dist_to = new double[nv];
       memset(connected, 0, nv * sizeof(int));
-      memset(connected, 0, nv * sizeof(double));
+      memset(dist_to, 0, nv * sizeof(double));
 
-      //
-      // Write to the file
-      //
+      // Write the file
       MPI_File_write(fh_connected, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
       MPI_File_write(fh_dist_to, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
 
@@ -111,17 +119,10 @@ int main(int argc, char **argv) {
       delete[] dist_to;
     }
 
+    MPI_File_close(&fh_connected);
     //
     // Start the real algo
     //
-
-    //
-    // The algo is done
-    // Delete this two file.
-    //
-    if (my_rank == 1) {
-      system("rm ./_&_*");
-    }
 
   } else {
     //
@@ -206,7 +207,15 @@ int main(int argc, char **argv) {
     // Make a criticalregion
     //
     MPI_Send(&nv, 1, MPI_INT, 1, lock_tag, MPI_COMM_WORLD);
+
   }
+
+  //
+  // Close the opened file. 
+  //
+  MPI_File_close(&fh_connected);
+  MPI_File_close(&fh_dist_to);
+
 
   MPI_Finalize();
 }

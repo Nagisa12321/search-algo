@@ -1,10 +1,11 @@
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <mpi.h>
-#include <vector>
+#include <string.h>
 #include <unordered_map>
-#include <functional>
+#include <vector>
 
 using namespace std;
 
@@ -13,7 +14,7 @@ const int inf = 0xffff;
 const int lock_tag = 0xeeff;
 
 double distance(const vector<unordered_map<int, double>> &ohd, int i, int j);
-void criticalregion(int comm_sz, int my_rank, function<void()> fn);
+void cycle_criticalregion(int comm_sz, int my_rank, function<void()> fn);
 
 int main(int argc, char **argv) {
   if (argc != 2) {
@@ -22,8 +23,8 @@ int main(int argc, char **argv) {
   }
 
   string input_file = argv[1];
-  int comm_sz;    // process num
-  int my_rank;    // process id  
+  int comm_sz; // process num
+  int my_rank; // process id
   MPI_Init(NULL, NULL);
   MPI_Comm_size(MPI_COMM_WORLD, &comm_sz);
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -32,12 +33,11 @@ int main(int argc, char **argv) {
     int nv;
     MPI_Recv(&nv, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     int my_first = ((my_rank - 1) * nv) / (comm_sz - 1);
-    int my_last = ((my_rank) * nv) / (comm_sz - 1) - 1;
+    int my_last = ((my_rank)*nv) / (comm_sz - 1) - 1;
 
     vector<unordered_map<int, double>> my_graph(nv);
-    
     //
-    // Recvice my data... 
+    // Recvice my data...
     //
     for (int i = my_first; i <= my_last; ++i) {
       double *tmp = new double[nv];
@@ -47,17 +47,17 @@ int main(int argc, char **argv) {
           my_graph[i][v] = tmp[v];
         }
       }
-      delete [] tmp;
+      delete[] tmp;
     }
 
-    // 
-    // Show my graph
-    // 
-    criticalregion(comm_sz, my_rank, [&]{
+    //
+    // Show my graph, and some message
+    //
+    cycle_criticalregion(comm_sz, my_rank, [&] {
+      cout << " >>>>>>> This is proc " << my_rank;
+      cout << ", my_first is" << my_first << ", my_last is " << my_last << ". ";
       int i, j;
-      cout << "\n";
-      cout << "  process " << my_rank << " matrix:\n";
-      cout << "\n";
+      cout << "  matrix:\n";
       cout << "\t";
       for (i = 0; i < nv; i++)
         cout << "\t[" << i << "]";
@@ -73,14 +73,63 @@ int main(int argc, char **argv) {
         }
         cout << "\n";
       }
+      cout << "\n" << endl;
     });
+
+    //
+    // Now start the dijkstra algo
+    // Create two files.
+    // connected.txt and dist_to.txt
+    const char *file_connected = "./_&_connected.txt";
+    const char *file_dist_to = "./_&_dist_to.txt";
+    MPI_File fh_connected, fh_dist_to;
+    //
+    // Open the file every process.
+    //
+    MPI_File_open(MPI_COMM_WORLD, file_connected,
+                  MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL,
+                  &fh_connected);
+    MPI_File_open(MPI_COMM_WORLD, file_dist_to, MPI_MODE_RDWR | MPI_MODE_CREATE,
+                  MPI_INFO_NULL, &fh_dist_to);
+
+    //
+    // Process 1 should init the file.
+    //
+    if (my_rank == 1) {
+      int *connected = new int[nv];
+      double *dist_to = new double[nv];
+      memset(connected, 0, nv * sizeof(int));
+      memset(connected, 0, nv * sizeof(double));
+
+      //
+      // Write to the file
+      //
+      MPI_File_write(fh_connected, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
+      MPI_File_write(fh_dist_to, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
+
+      delete[] connected;
+      delete[] dist_to;
+    }
+
+    //
+    // Start the real algo
+    //
+
+    //
+    // The algo is done
+    // Delete this two file.
+    //
+    if (my_rank == 1) {
+      system("rm ./_&_*");
+    }
+
   } else {
     //
-    // Read the input file 
-    // and send it to every process. 
+    // Read the input file
+    // and send it to every process.
     //
-    int nv;     // number of vertexes 
-    int edges;  // number of edges 
+    int nv;    // number of vertexes
+    int edges; // number of edges
     cout << "process 0 start to read file." << endl;
 
     ifstream fis(input_file);
@@ -89,7 +138,7 @@ int main(int argc, char **argv) {
     cout << "   Number of vertex: " << nv << endl;
     cout << "   Number of edges: " << edges << endl;
 
-    // 
+    //
     // Send the number of vertex to every process
     //
     for (int rank = 1; rank < comm_sz; ++rank) {
@@ -135,13 +184,13 @@ int main(int argc, char **argv) {
 
     cout << "Now start to send the data to the process. " << endl;
     //
-    // send the different to different process. 
-    // 
+    // send the different to different process.
+    //
     for (int rank = 1; rank < comm_sz; ++rank) {
       int first = ((rank - 1) * nv) / (comm_sz - 1);
-      int last = ((rank) * nv) / (comm_sz - 1) - 1;
-      cout << "index " << first << " to " << last 
-           << " will send to process " << rank << endl;
+      int last = ((rank)*nv) / (comm_sz - 1) - 1;
+      cout << "index " << first << " to " << last << " will send to process "
+           << rank << endl;
       for (int i = first; i <= last; ++i) {
         double *tmp = new double[nv];
         for (int v = 0; v < nv; ++v) {
@@ -149,7 +198,7 @@ int main(int argc, char **argv) {
         }
         // send every line of graph to the proc
         MPI_Send(tmp, nv, MPI_DOUBLE, rank, 0, MPI_COMM_WORLD);
-        delete [] tmp;
+        delete[] tmp;
       }
     }
 
@@ -157,24 +206,24 @@ int main(int argc, char **argv) {
     // Make a criticalregion
     //
     MPI_Send(&nv, 1, MPI_INT, 1, lock_tag, MPI_COMM_WORLD);
-
   }
 
   MPI_Finalize();
 }
 
-
 double distance(const vector<unordered_map<int, double>> &ohd, int i, int j) {
-  if (!ohd[i].count(j)) return inf;
-  else return ohd[i].at(j);
+  if (!ohd[i].count(j))
+    return inf;
+  else
+    return ohd[i].at(j);
 }
 
 //
-// !Warnning: 
-// !It's better not to use it. 
+// !Warnning:
+// !It's better not to use it.
 // !Because it's too slow...
 //
-void criticalregion(int comm_sz, int my_rank, function<void()> fn) {
+void cycle_criticalregion(int comm_sz, int my_rank, function<void()> fn) {
   int value;
   MPI_Recv(&value, 1, MPI_INT, my_rank - 1, lock_tag, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);

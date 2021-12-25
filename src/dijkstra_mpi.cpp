@@ -88,7 +88,8 @@ int main(int argc, char **argv) {
     //
     // Recvice my data...
     //
-    for (int i = my_first; i <= my_last; ++i) {
+    // for (int i = my_first; i <= my_last; ++i) {
+    for (int i = 0; i < nv; ++i) {
       double *tmp = new double[nv];
       MPI_Recv(tmp, nv, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       for (int v = 0; v < nv; ++v) {
@@ -99,33 +100,7 @@ int main(int argc, char **argv) {
       delete[] tmp;
     }
 
-    //
-    // Show my graph, and some message
-    //
-    cycle_criticalregion(comm_sz, my_rank, [&] {
-      cout << " >>>>>>> This is proc " << my_rank;
-      cout << ", my_first is " << my_first << ", my_last is " << my_last << ". ";
-      int i, j;
-      cout << "  matrix:\n";
-      cout << "\t";
-      for (i = 0; i < nv; i++)
-        cout << "\t[" << i << "]";
-      cout << endl;
-      for (i = my_first; i <= my_last; i++) {
-        cout << "\t[" << i << "]";
-        for (j = 0; j < nv; j++) {
-          if (!my_graph[i].count(j)) {
-            cout << "\tInf";
-          } else {
-            cout << "\t" << my_graph[i][j];
-          }
-        }
-        cout << "\n";
-      }
-      cout << "\n" << endl;
-    });
-
-    MPI_Barrier(barrier_comm);
+    MPI_Barrier(MPI_COMM_WORLD);
     //
     // Start the real algo
     //
@@ -142,7 +117,7 @@ int main(int argc, char **argv) {
         // MPI_File_write_at(MPI_File fh, MPI_Offset offset, const void *buf,
         //                   int count, MPI_Datatype datatype, MPI_Status *status)
         MPI_File_write_at(fh_variables, 0, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-        MPI_File_write_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+        MPI_File_write_at(fh_variables, sizeof(double), &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
       }
       
       double my_md = inf;
@@ -152,8 +127,8 @@ int main(int argc, char **argv) {
       //  Some threads might have no unconnected nodes left.
       //  get dist_to and connected. 
       //
-      MPI_File_read(fh_connected, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
-      MPI_File_read(fh_dist_to, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
+      MPI_File_read_at(fh_connected, 0, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
+      MPI_File_read_at(fh_dist_to, 0, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
       for (int i = my_first; i <= my_last; ++i) {
         if (!connected[i] && dist_to[i] < my_md) {
           my_md = dist_to[i];
@@ -169,15 +144,14 @@ int main(int argc, char **argv) {
         // Read the mv and md. 
         //
         MPI_File_read_at(fh_variables, 0, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-        MPI_File_read_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
-        cout << "read md and mv, md = " << md << ", mv = " << mv << endl;
+        MPI_File_read_at(fh_variables, sizeof(double), &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
         // 
         // If I have greate mv and md 
         // renew it!
         // 
         if (my_md < md) {
           MPI_File_write_at(fh_variables, 0, &my_md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-          MPI_File_write_at(fh_variables, 2, &my_mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+          MPI_File_write_at(fh_variables, sizeof(double), &my_mv, 1, MPI_INT, MPI_STATUS_IGNORE);
         }
       });
       //
@@ -189,12 +163,12 @@ int main(int argc, char **argv) {
       //
       if (my_rank == 1) {
         // read the mv first
-        MPI_File_read_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+        MPI_File_read_at(fh_variables, sizeof(double), &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
         if (mv != -1) { 
           int tmp = 1;
           // MPI_File_write_at(MPI_File fh, MPI_Offset offset, const void *buf,
           //                   int count, MPI_Datatype datatype, MPI_Status *status)
-          MPI_File_write_at(fh_connected, mv, &tmp, 1, MPI_INT, MPI_STATUS_IGNORE);
+          MPI_File_write_at(fh_connected, mv * sizeof(int), &tmp, 1, MPI_INT, MPI_STATUS_IGNORE);
           cout << " >>> connecting node " << mv << "..." << endl;
         }
       }
@@ -208,12 +182,9 @@ int main(int argc, char **argv) {
       // Read the mv and md. 
       // mv and md are now the latest and correct values
       //
-      MPI_File_read(fh_connected, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
-      for (int i = 0; i < nv; ++i)
-        cout << connected[i] << ' ';
-      cout << endl;
+      MPI_File_read_at(fh_connected, 0, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
       MPI_File_read_at(fh_variables, 0, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-      MPI_File_read_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+      MPI_File_read_at(fh_variables, sizeof(double), &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
       if (mv != -1) {
         for (int i = my_first; i <= my_last; ++i) {
           if (!connected[i]) {
@@ -228,8 +199,12 @@ int main(int argc, char **argv) {
       //
       // update the dist_to to the file . 
       //
-      MPI_File_write_at(fh_dist_to, my_first, dist_to + my_first,
-                        my_last - my_first + 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+      // MPI_File_write_at(MPI_File fh, MPI_Offset offset, const void *buf,
+      //                   int count, MPI_Datatype datatype, MPI_Status *status)
+      cycle_criticalregion(comm_sz, my_rank, [&]{
+        MPI_File_write_at(fh_dist_to, my_first * sizeof(double), dist_to + my_first,
+                          my_last - my_first + 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+      });
 
       //
       // Make sure that every thread have update the dist_to.
@@ -277,42 +252,60 @@ int main(int argc, char **argv) {
     double d;
     for (int i = 0; i < edges; ++i) {
       fis >> from >> to >> d;
-      graph[to][from] = d;
+      graph[from][to] = d;
     }
     cout << "ok" << endl;
 
     //
     // Print the matrix
     //
-    int i, j;
-    cout << "\n";
-    cout << "  Distance matrix:\n";
-    cout << "\n";
-    cout << "\t";
-    for (i = 0; i < nv; i++)
-      cout << "\t[" << i << "]";
-    cout << endl;
-    for (i = 0; i < nv; i++) {
-      cout << "\t[" << i << "]";
-      for (j = 0; j < nv; j++) {
-        if (!graph[i].count(j)) {
-          cout << "\tInf";
-        } else {
-          cout << "\t" << graph[i][j];
-        }
-      }
-      cout << "\n";
-    }
+    // int i, j;
+    // cout << "\n";
+    // cout << "  Distance matrix:\n";
+    // cout << "\n";
+    // cout << "\t";
+    // for (i = 0; i < nv; i++)
+    //   cout << "\t[" << i << "]";
+    // cout << endl;
+    // for (i = 0; i < nv; i++) {
+    //   cout << "\t[" << i << "]";
+    //   for (j = 0; j < nv; j++) {
+    //     if (!graph[i].count(j)) {
+    //       cout << "\tInf";
+    //     } else {
+    //       cout << "\t" << graph[i][j];
+    //     }
+    //   }
+    //   cout << "\n";
+    // }
+
+    int *connected = new int[nv];
+    double *dist_to = new double[nv];
+    memset(connected, 0, nv * sizeof(int));
+    memset(dist_to, 0, nv * sizeof(double));
+    connected[0] = true;
+    for (int i = 0; i < nv; ++i) 
+      dist_to[i] = distance(graph, 0, i);
+    cout << "Now Init the connected file and the dist_to file. " << endl;
+    //
+    // Write the file
+    // 1) init the connected/dist_to
+    // 2) init the md, mv
+    // 
+    MPI_File_write_at(fh_connected, 0, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
+    MPI_File_write_at(fh_dist_to, 0, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
+    cout << "Ok to init the two file. " << endl;
 
     cout << "Now start to send the data to the process. " << endl;
     //
     // send the different to different process.
     //
     for (int rank = 1; rank < comm_sz; ++rank) {
-      int first = ((rank - 1) * nv) / (comm_sz - 1);
-      int last = ((rank)*nv) / (comm_sz - 1) - 1;
+      // int first = ((rank - 1) * nv) / (comm_sz - 1);
+      // int last = ((rank)*nv) / (comm_sz - 1) - 1;
 			
-      for (int i = first; i <= last; ++i) {
+      // for (int i = first; i <= last; ++i) {
+      for (int i = 0; i < nv; ++i) {
         double *tmp = new double[nv];
         for (int v = 0; v < nv; ++v) {
           tmp[v] = distance(graph, i, v);
@@ -323,34 +316,12 @@ int main(int argc, char **argv) {
       }
     }
 
-    //
-    // Setup the connected and dist_to. 
-    //
-    int *connected = new int[nv];
-    double *dist_to = new double[nv];
-    memset(connected, 0, nv * sizeof(int));
-    memset(dist_to, 0, nv * sizeof(double));
 
-    // 
-    // setup the connected and dist_to
-    // 
-    connected[0] = true;
-    for (int i = 0; i < nv; ++i) 
-      dist_to[i] = distance(graph, 0, i);
-    cout << "Now Init the connected file and the dist_to file. " << endl;
-    //
-    // Write the file
-    // 1) init the connected/dist_to
-    // 2) init the md, mv
-    // 
-    MPI_File_write(fh_connected, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
-    MPI_File_write(fh_dist_to, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
-    cout << "Ok to init the two file. " << endl;
-
+    MPI_Barrier(MPI_COMM_WORLD);
     //
     // Make a criticalregion
     //
-    for (int i = 0; i < nv; ++i) {
+    for (int i = 0; i < (nv - 1) << 1; ++i) {
       MPI_Send(&nv, 1, MPI_INT, 1, lock_tag, MPI_COMM_WORLD);
     }
     // 
@@ -367,7 +338,9 @@ int main(int argc, char **argv) {
     // 
     // So now read the dist_to file. 
     // 
-    MPI_File_read(fh_dist_to, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
+    MPI_File_read_at(fh_dist_to, 0, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
+    // shit
+    dist_to[0] = 0;
 
     // 
     // Show result, 
@@ -377,6 +350,14 @@ int main(int argc, char **argv) {
     cout << "\n";
     for (int i = 0; i < nv; i++) {
       cout << "  " << setw(2) << i << "  " << setw(2) << dist_to[i] << "\n";
+    }
+
+    //
+    // write to file... 
+    //
+    std::ofstream fos("dijkstra_mpi.txt");
+    for (int i = 0; i < nv; ++i) {
+      fos << i << ": " << dist_to[i] << endl;
     }
 
     delete[] connected;
@@ -394,10 +375,10 @@ int main(int argc, char **argv) {
 }
 
 double distance(const vector<unordered_map<int, double>> &ohd, int i, int j) {
-  if (!ohd[j].count(i))
+  if (!ohd[i].count(j))
     return inf;
   else
-    return ohd[j].at(i);
+    return ohd[i].at(j);
 }
 
 //

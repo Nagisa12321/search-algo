@@ -14,7 +14,7 @@ using namespace std;
 #define DEBUG_MODE 		false
 #define PRINT_MATRIX	false
 #define TIMER			true
-#define PRINT_FILE		false
+#define PRINT_FILE		true
 #define TIMER_FILE 		true
 
 

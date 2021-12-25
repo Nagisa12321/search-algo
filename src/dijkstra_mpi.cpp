@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <mpi.h>
 #include <mpio.h>
@@ -14,6 +15,7 @@ using namespace std;
 // inf
 const int inf = 0xffff;
 const int lock_tag = 0xeeff;
+const int ok_tag = 0xaabb;
 
 double distance(const vector<unordered_map<int, double>> &ohd, int i, int j);
 void cycle_criticalregion(int comm_sz, int my_rank, function<void()> fn);
@@ -51,6 +53,31 @@ int main(int argc, char **argv) {
                 MPI_MODE_RDWR | MPI_MODE_DELETE_ON_CLOSE | MPI_MODE_CREATE,
                 MPI_INFO_NULL, &fh_variables);
 
+  //
+  // Create a new comm for the barrier
+  //
+  // Get the group or processes of the default communicator
+  MPI_Group world_group;
+  MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+  // Keep only the processes 0 and 1 in the new group.
+  int *ranks = new int[comm_sz - 1];
+  for (int i = 0; i < comm_sz - 1; ++i)
+    ranks[i] = i + 1;
+  MPI_Group new_group;
+  MPI_Group_incl(world_group, comm_sz - 1, ranks, &new_group);
+
+  // Create the new communicator from that group of processes.
+  MPI_Comm barrier_comm;
+  MPI_Comm_create(MPI_COMM_WORLD, new_group, &barrier_comm);
+
+  int value;
+  MPI_Bcast(&value, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  printf("Process %d took part to the global communicator broadcast.\n", my_rank);
+
+  // Let's wait all processes before proceeding to the second phase.
+  MPI_Barrier(MPI_COMM_WORLD);
+
   if (my_rank != 0) {
     int nv;
     MPI_Recv(&nv, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -77,7 +104,7 @@ int main(int argc, char **argv) {
     //
     cycle_criticalregion(comm_sz, my_rank, [&] {
       cout << " >>>>>>> This is proc " << my_rank;
-      cout << ", my_first is" << my_first << ", my_last is " << my_last << ". ";
+      cout << ", my_first is " << my_first << ", my_last is " << my_last << ". ";
       int i, j;
       cout << "  matrix:\n";
       cout << "\t";
@@ -98,6 +125,7 @@ int main(int argc, char **argv) {
       cout << "\n" << endl;
     });
 
+    MPI_Barrier(barrier_comm);
     //
     // Start the real algo
     //
@@ -111,8 +139,10 @@ int main(int argc, char **argv) {
       if (my_rank == 1) {
         md = inf;
         mv = -1;
+        // MPI_File_write_at(MPI_File fh, MPI_Offset offset, const void *buf,
+        //                   int count, MPI_Datatype datatype, MPI_Status *status)
         MPI_File_write_at(fh_variables, 0, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-        MPI_File_write_at(fh_variables, 1, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+        MPI_File_write_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
       }
       
       double my_md = inf;
@@ -138,37 +168,55 @@ int main(int argc, char **argv) {
         //
         // Read the mv and md. 
         //
-        MPI_File_read_at(fh_variables, 0, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
-        MPI_File_read_at(fh_variables, 1, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-
+        MPI_File_read_at(fh_variables, 0, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+        MPI_File_read_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+        cout << "read md and mv, md = " << md << ", mv = " << mv << endl;
         // 
         // If I have greate mv and md 
         // renew it!
         // 
         if (my_md < md) {
-          MPI_File_write_at(fh_variables, 0, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-          MPI_File_write_at(fh_variables, 1, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+          MPI_File_write_at(fh_variables, 0, &my_md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+          MPI_File_write_at(fh_variables, 2, &my_mv, 1, MPI_INT, MPI_STATUS_IGNORE);
         }
       });
-
       //
       // make sure that md is the small path to a new node.
       //
-      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Barrier(barrier_comm);
+      // 
+      // Update the connected file 
       //
+      if (my_rank == 1) {
+        // read the mv first
+        MPI_File_read_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
+        if (mv != -1) { 
+          int tmp = 1;
+          // MPI_File_write_at(MPI_File fh, MPI_Offset offset, const void *buf,
+          //                   int count, MPI_Datatype datatype, MPI_Status *status)
+          MPI_File_write_at(fh_connected, mv, &tmp, 1, MPI_INT, MPI_STATUS_IGNORE);
+          cout << " >>> connecting node " << mv << "..." << endl;
+        }
+      }
+
+      //
+      // Make sure connecteed file is flush. 
+      // 
+      MPI_Barrier(barrier_comm);
+      //
+      // Update connected. 
       // Read the mv and md. 
       // mv and md are now the latest and correct values
       //
-      MPI_File_read_at(fh_variables, 0, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
-      MPI_File_read_at(fh_variables, 1, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+      MPI_File_read(fh_connected, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
+      for (int i = 0; i < nv; ++i)
+        cout << connected[i] << ' ';
+      cout << endl;
+      MPI_File_read_at(fh_variables, 0, &md, 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+      MPI_File_read_at(fh_variables, 2, &mv, 1, MPI_INT, MPI_STATUS_IGNORE);
       if (mv != -1) {
         for (int i = my_first; i <= my_last; ++i) {
           if (!connected[i]) {
-            //
-            // Why we can do this ? 
-            // Because mv is now in the tree. 
-            // So dist_to[mv] is the correct value!
-            // 
             if (dist_to[i] > dist_to[mv] + distance(my_graph, mv, i)) {
               dist_to[i] = dist_to[mv] + distance(my_graph, mv, i);
             }
@@ -176,16 +224,27 @@ int main(int argc, char **argv) {
         }
       }
 
+      // MPI_Barrier(MPI_COMM_WORLD);
+      //
       // update the dist_to to the file . 
+      //
+      MPI_File_write_at(fh_dist_to, my_first, dist_to + my_first,
+                        my_last - my_first + 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
 
       //
       // Make sure that every thread have update the dist_to.
       // 
-      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Barrier(barrier_comm);
     }
 
     delete[] connected;
     delete[] dist_to;
+
+    // 
+    // Tell the process 0 that I am OK. 
+    //
+    int ok = 123;
+    MPI_Send(&ok, 1, MPI_INT, 0, ok_tag, MPI_COMM_WORLD);
   } else {
     //
     // Read the input file
@@ -218,7 +277,7 @@ int main(int argc, char **argv) {
     double d;
     for (int i = 0; i < edges; ++i) {
       fis >> from >> to >> d;
-      graph[from][to] = d;
+      graph[to][from] = d;
     }
     cout << "ok" << endl;
 
@@ -278,6 +337,7 @@ int main(int argc, char **argv) {
     connected[0] = true;
     for (int i = 0; i < nv; ++i) 
       dist_to[i] = distance(graph, 0, i);
+    cout << "Now Init the connected file and the dist_to file. " << endl;
     //
     // Write the file
     // 1) init the connected/dist_to
@@ -285,14 +345,42 @@ int main(int argc, char **argv) {
     // 
     MPI_File_write(fh_connected, connected, nv, MPI_INT, MPI_STATUS_IGNORE);
     MPI_File_write(fh_dist_to, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
-
-    delete[] connected;
-    delete[] dist_to;
+    cout << "Ok to init the two file. " << endl;
 
     //
     // Make a criticalregion
     //
-    MPI_Send(&nv, 1, MPI_INT, 1, lock_tag, MPI_COMM_WORLD);
+    for (int i = 0; i < nv; ++i) {
+      MPI_Send(&nv, 1, MPI_INT, 1, lock_tag, MPI_COMM_WORLD);
+    }
+    // 
+    // Recv the ok format from every proc
+    //
+    for (int rank = 1; rank < comm_sz; ++rank) {
+      int ok = 0;
+      MPI_Recv(&ok, 1, MPI_INT, rank, ok_tag, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
+
+      cout << " !!proc " << rank << " is over " << endl;
+    }
+
+    // 
+    // So now read the dist_to file. 
+    // 
+    MPI_File_read(fh_dist_to, dist_to, nv, MPI_DOUBLE, MPI_STATUS_IGNORE);
+
+    // 
+    // Show result, 
+    // 
+    cout << "\n";
+    cout << "  Minimum distances from node 0:\n";
+    cout << "\n";
+    for (int i = 0; i < nv; i++) {
+      cout << "  " << setw(2) << i << "  " << setw(2) << dist_to[i] << "\n";
+    }
+
+    delete[] connected;
+    delete[] dist_to;
   }
 
   //
@@ -300,15 +388,16 @@ int main(int argc, char **argv) {
   //
   MPI_File_close(&fh_connected);
   MPI_File_close(&fh_dist_to);
+  MPI_File_close(&fh_variables);
 
   MPI_Finalize();
 }
 
 double distance(const vector<unordered_map<int, double>> &ohd, int i, int j) {
-  if (!ohd[i].count(j))
+  if (!ohd[j].count(i))
     return inf;
   else
-    return ohd[i].at(j);
+    return ohd[j].at(i);
 }
 
 //

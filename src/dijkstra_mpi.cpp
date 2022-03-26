@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <iostream>
 #include <mpi.h>
-#include <mpio.h>
 #include <string.h>
 #include <unordered_map>
 #include <vector>
@@ -36,9 +35,9 @@ int main(int argc, char **argv) {
   //
   // Open File
   //
-  const char *file_connected = "./connected.txt";
-  const char *file_dist_to = "./dist_to.txt";
-  const char *file_variables = "./dist_to.txt";
+  char *file_connected = "./connected.txt";
+  char *file_dist_to = "./dist_to.txt";
+  char *file_variables = "./dist_to.txt";
   // Create two files.
   // connected.txt and dist_to.txt
   MPI_File fh_connected, fh_dist_to, fh_variables;

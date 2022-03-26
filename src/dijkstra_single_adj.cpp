@@ -9,7 +9,7 @@
 using namespace std;
 
 // config
-#define PRINT_DISTANCE_MATRIX false
+#define PRINT_DISTANCE_MATRIX true
 #define PRINT_RESULT true
 #define PRINT_FILE true
 

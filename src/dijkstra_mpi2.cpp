@@ -49,9 +49,11 @@ int main(int argc, char **argv) {
     //
     // Input style
     //
-    if (argc != 2) {
-        panic("Please use ./dijkstra_mpi [resources name]");
+    if (argc != 3) {
+        panic("Please use ./dijkstra_mpi [resources name] [out_file_name]");
     }
+
+    std::string out_file_name(argv[2]);
     // 
     // Read n:
     // Process 0 should read the n
@@ -203,6 +205,16 @@ int main(int argc, char **argv) {
         cout << "\n";
         for (int i = 0; i < g_n; i++) {
           cout << "  " << setw(2) << i << "  " << setw(2) << g_dist_to[i] << "\n";
+        }
+    }
+
+    //
+    // write to file... 
+    //
+    if (my_rank == 0) {
+        std::ofstream fos(out_file_name);
+        for (int i = 0; i < g_n; ++i) {
+            fos << i << ": " << g_dist_to[i] << endl;
         }
     }
 
